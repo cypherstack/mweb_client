@@ -2,7 +2,6 @@ import 'package:fixnum/fixnum.dart';
 import 'package:test/test.dart';
 import 'package:grpc/grpc.dart';
 import 'package:mweb_client/mweb_client.dart';
-import 'package:mweb_client/src/generated/mwebd.pbgrpc.dart';
 import 'dart:async';
 
 Server? _server;
@@ -30,13 +29,30 @@ void main() {
   });
 
   group('MwebClient - gRPC Integration Tests', () {
+    test('legacy createRepeated API remains usable', () {
+      final repeated = StatusRequest.createRepeated();
+      repeated.add(StatusRequest());
+
+      expect(repeated, hasLength(1));
+    });
+
+    test('legacy RpcApi remains exported', () {
+      expect(RpcApi, isA<Type>());
+    });
+
     test('address returns expected response', () async {
       final scanSecret = [1, 2, 3];
       final spendPub = [4, 5, 6];
       final index = 0;
 
       final result = await client.address(scanSecret, spendPub, index);
-      expect(result, 'address: addr1\n');
+      expect(result, 'addr1');
+    });
+
+    test('addresses returns the published 0.2.0 list contract', () async {
+      final result = await client.addresses([1, 2, 3], [4, 5, 6], 1, 4);
+
+      expect(result, ['addr1', 'addr2', 'addr3']);
     });
 
     test('status returns expected response', () async {
@@ -80,6 +96,11 @@ void main() {
 
 // server mock
 class MockRpcService extends RpcServiceBase {
+  // Keep this fixture forward-compatible with RPCs added to mwebd.proto that
+  // are unrelated to the client methods exercised below.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   @override
   Future<AddressResponse> addresses(
     ServiceCall call,
